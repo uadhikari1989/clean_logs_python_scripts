@@ -1,0 +1,38 @@
+---
+- name: House Keeping 90 days old log files
+  hosts: win
+  vars:
+    directories: ['C:\App\logs\LogFiles']
+    filepattern: ['*.log']
+    days: 3
+  tasks:
+    - name: Find Log LogFiles
+      tags: always
+      vars: 
+        - daysinseconds: "{{ 86400 * days }}"
+      win_find: 
+        paths: "{{directories}}"
+        age: "{{daysinseconds}}"
+        age_stamp: ctime
+        patterns: "{{filepattern}}"
+        recurse: yes
+      register: filestoremove
+    
+    - name: list of files to be removed
+      tags: always
+      vars: 
+        files: "{{ filestoremove.files | json_query('[].path') }}"
+      debug: var=files
+      when: filestoremove.matched > 0
+
+    - name: remove the files found - this would work only when you call the --tags=delete
+      tags: never,delete
+      vars: 
+        files: "{{ filestoremove.files | json_query('[].path') }}"
+      win_file: 
+        path: "{{item}}"
+        state: absent
+      with_items: 
+        - "{{files}}"
+      when: filestoremove.matched > 0
+    
